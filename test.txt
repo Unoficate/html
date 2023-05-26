@@ -1,0 +1,265 @@
+import tkinter as tk
+import tkinter.ttk as ttk
+import pyodbc
+import tkinter.messagebox as messagebox
+from tkcalendar import DateEntry
+ 
+conn = pyodbc.connect(driver="{SQL Server}", server="127.0.0.1", database="db22203", uid="User015", pwd="User015<&91")
+cursor = conn.cursor()
+ 
+class Application(tk.Tk):
+ 
+    def __init__(self):
+        super().__init__()
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.title("Пациенты")
+        self.resizable(False, False)
+        self.wm_attributes("-topmost", 1)
+        self.wm_attributes("-topmost", 0)
+        self.create_widgets()
+ 
+    def create_widgets(self):
+ 
+        self.canvas = tk.Canvas(self, width=1001, height=651, highlightthickness=0)
+        self.canvas.pack()
+ 
+        # добавляем хедер на отдельный канвас
+        self.header_canvas = tk.Canvas(self.canvas, width=1001, height=131, highlightthickness=0)
+        self.header_fig = tk.PhotoImage(file="Header.png").subsample(1, 1)
+        self.header_canvas.create_image(0, 0, anchor="nw", image=self.header_fig)
+        self.header_canvas.pack()
+ 
+        self.table_canvas = tk.Canvas(self.canvas, width=1001, height=320, highlightthickness=0)
+        self.table_canvas.pack()
+        self.table_canvas.configure(bg="white", bd=0)
+ 
+        # Создаем новый стиль для таблицы
+        style = ttk.Style()
+        style.configure("Custom.Treeview", background="white",
+                        fieldbackground="white", font=("Arial", 12),
+                        borderwidth=2, bordercolor="black")
+        style.configure("Custom.Treeview.Heading", background="white",
+                        foreground="black", font=("Arial", 12, "bold"))
+ 
+        self.table_fig = tk.PhotoImage(file="Table.png").subsample(1, 1)
+ 
+        # Используем новый стиль при создании таблицы
+        self.table = ttk.Treeview(self.table_canvas, style="Custom.Treeview", columns=("full_name", "birthdate", "address"), show="headings")
+        self.table.column("full_name", width=500)
+        self.table.column("birthdate", width=333)
+        self.table.column("address", width=168)
+        self.table.heading("full_name", text="ФИО пациента")
+        self.table.heading("birthdate", text="Дата рождения")
+        self.table.heading("address", text="Адрес")
+        self.table.pack(fill=tk.BOTH, expand=True)
+ 
+        self.table_canvas.create_image(0, 0, anchor="nw", image=self.table_fig)
+ 
+        # Добавление данных в таблицу при открытии приложения
+        cursor.execute(
+            "SELECT txtPatientSurname, txtPatientName, txtPatientSecondName, datBirthday, txtAddress FROM tblPatient")
+        patients = cursor.fetchall()
+        for patient in patients:
+            full_name = " ".join([patient[0], patient[1], patient[2]])  # Фамилия Имя Отчество с пробелом
+            birthdate = patient[3]
+            address = patient[4]
+            self.table.insert("", "end", values=(full_name, birthdate, address))
+ 
+        self.footer_canvas = tk.Canvas(self.canvas, width=1001, height=200, highlightthickness=0, bd=0)
+        self.footer_canvas.configure(bg="#eaeaea")
+        self.footer_canvas.pack(side=tk.BOTTOM, anchor=tk.S, fill=tk.X)
+ 
+        self.our_button = tk.PhotoImage(file="Button1.png").subsample(1, 1)
+        self.our_button2 = tk.PhotoImage(file="Button2.png").subsample(1, 1)
+        self.our_button3 = tk.PhotoImage(file="Button3.png").subsample(1, 1)
+ 
+        button1 = tk.Button(self.footer_canvas, image=self.our_button, highlightthickness=0, bd=0,
+                            command=self.add_patient, width=320)
+        button1.pack(side=tk.LEFT)
+        button1.configure(bg="white", activebackground="white")
+ 
+        button2 = tk.Button(self.footer_canvas, image=self.our_button2, highlightthickness=0, bd=0,
+                            command=self.check_procedure, width=320)
+        button2.pack(side=tk.LEFT, padx=20)
+        button2.configure(bg="white", activebackground="white")
+ 
+        button3 = tk.Button(self.footer_canvas, image=self.our_button3, highlightthickness=0, bd=0,
+                            command=self.appoint_procedure, width=320)
+        button3.pack(side=tk.LEFT)
+        button3.configure(bg="white", activebackground="white")
+ 
+    def save_patient(self, full_name, birthdate, address):
+        # Разбиваем на компоненты
+        surname, name, second_name = full_name.split(" ")
+ 
+        cursor.execute("INSERT INTO tblPatient (txtPatientSurname, txtPatientName, txtPatientSecondName, datBirthday, txtAddress) VALUES (?, ?, ?, ?, ?)", surname, name, second_name, birthdate, address)
+        conn.commit()
+ 
+        # обновляем бд
+        self.table.insert("", "end", values=(full_name, birthdate, address))
+ 
+    def add_patient(self):
+ 
+        add_patient_window = tk.Toplevel(self)
+        add_patient_window.geometry("500x300")
+        add_patient_window.minsize(500, 300)
+        add_patient_window.maxsize(500, 300)
+ 
+        # установите флаг resizable в False, чтобы окно нельзя было изменять по размеру
+        add_patient_window.resizable(False, False)
+        add_patient_window.transient(self)
+        add_patient_window.title("Новый пациент")
+        add_patient_window.grab_set()
+ 
+        full_name_label = tk.Label(add_patient_window, text="ФИО пациента:")
+        full_name_label.pack()
+        full_name_entry = tk.Entry(add_patient_window)
+        full_name_entry.pack()
+ 
+        birthdate_label = tk.Label(add_patient_window, text="Дата рождения: (год-месяц-день)")
+        birthdate_label.pack()
+        birthdate_entry = tk.Entry(add_patient_window)
+        birthdate_entry.pack()
+ 
+        address_label = tk.Label(add_patient_window, text="Адрес пациента:")
+        address_label.pack()
+        address_entry = tk.Entry(add_patient_window)
+        address_entry.pack()
+ 
+        self.save_img = tk.PhotoImage(file='Add.png').subsample(1, 1)
+        save_button = tk.Button(add_patient_window, text="Сохранить", image=self.save_img, height=20, width=100,
+                                command=lambda: self.save_patient(full_name_entry.get(), birthdate_entry.get(), address_entry.get()))
+        save_button.pack()
+ 
+        self.cancel_img = tk.PhotoImage(file='Add-1.png').subsample(1, 1)
+        cancel_button = tk.Button(add_patient_window, text="Отмена", image=self.cancel_img, height=20, width=100,
+                                  command=add_patient_window.destroy)
+        cancel_button.pack()
+ 
+        # Добавьте отступы как нужно, чтобы кнопки были отдельно друг от друга
+        save_button.pack(pady=10)
+        cancel_button.pack(pady=10)
+ 
+        # Центрируем окно по центру экрана
+        screen_width = add_patient_window.winfo_screenwidth()
+        screen_height = add_patient_window.winfo_screenheight()
+        x = (screen_width - add_patient_window.winfo_reqwidth()) / 2
+        y = (screen_height - add_patient_window.winfo_reqheight()) / 2
+        add_patient_window.geometry("+%d+%d" % (x, y))
+ 
+        # Отображаем окно
+        add_patient_window.deiconify()
+ 
+    def check_procedure(self):
+        # создаем новое окно
+        self.procedure_window = tk.Toplevel(self)
+        self.procedure_window.title('Процедуры')
+        self.procedure_window.resizable(False, False)
+        self.procedure_window.grab_set()
+ 
+        # создаем таблицу
+        self.procedure_table = ttk.Treeview(self.procedure_window, columns=(
+        'ttype', 'date_begin', 'date_end', 'count', 'count_fact', 'doctor'))
+        self.procedure_table.heading('#0', text='ID')
+        self.procedure_table.column('#0', width=50)
+        self.procedure_table.heading('ttype', text='Вид процедуры')
+        self.procedure_table.column('ttype', width=150)
+        self.procedure_table.heading('date_begin', text='Дата начала курса')
+        self.procedure_table.column('date_begin', width=150)
+        self.procedure_table.heading('date_end', text='Дата окончания курса')
+        self.procedure_table.column('date_end', width=150)
+        self.procedure_table.heading('count', text='Количество назначенных процедур')
+        self.procedure_table.column('count', width=200)
+        self.procedure_table.heading('count_fact', text='Количество проведенных процедур')
+        self.procedure_table.column('count_fact', width=200)
+        self.procedure_table.heading('doctor', text='ФИО доктора')
+        self.procedure_table.column('doctor', width=200)
+        self.procedure_table.pack(padx=10, pady=10)
+ 
+    def appoint_procedure(self):
+        print("Okay too too")
+ 
+    def on_closing(self):
+        if messagebox.askokcancel("Выход из приложения", "Хотите выйти из приложения?"):
+            self.destroy()
+ 
+app = Application()
+app.mainloop()
+ 
+Допиши код согласно: Допиши форму в коде с именем «check_procedure» для просмотра данных о назначенных процедурах
+одного пациента, в которой находятся все данные о пациенте и подчиненная форма со
+следующими столбцами: «Вид процедуры», «Дата начала курса», «Дата окончания курса»,
+«Количество назначенных процедур», «Количество проведенных процедур» «ФИО доктора».
+Форма вызывается из формы «Пациенты» при выборе одного из пациентов и двойном щелчке
+в соответствующем поле «ФИО пациента».
+ 
+Наполнение таблиц: 
+ 
+CREATE TABLE tblPatient(
+	intPatientId INT PRIMARY KEY IDENTITY(1,1),
+	txtPatientSurname CHAR(30),
+	txtPatientName CHAR(25),
+	txtPatientSecondName CHAR(30),
+	datBirthday DATE,
+	txtAddress CHAR(100)
+);
+ 
+CREATE TABLE tblDoctor(
+	intDoctorId INT PRIMARY KEY IDENTITY(1,1),
+	txtDoctorName CHAR(150),
+	txtSpecialist CHAR(35),
+	datDoctorWork DATE
+);
+ 
+CREATE TABLE tblTreatmentType(
+	intTreatmentTypeId INT PRIMARY KEY IDENTITY(1,1),
+	txtTreatmentTypeName CHAR(100),
+	txtTreatmentTypeDescription CHAR(255),
+	fltTreatmentPrice DECIMAL
+);
+ 
+CREATE TABLE tblTreatmentSet(
+	intTreatmentSetId INT PRIMARY KEY IDENTITY(1,1),
+	intDoctorId INT,
+	intPatientId INT,
+	datDateBegin DATE,
+	datDateEnd DATE,
+	txtTreatmentSetRoom CHAR(5),
+	intTreatmentSetCount INT,
+	intTreatmentSetCountFact INT,
+	intTreatmentTypeId INT
+);
+ 
+CREATE TABLE tblTreatmentVisit(
+	intTreatmentVisitId INT PRIMARY KEY IDENTITY(1,1),
+	intTreatmentSetId INT,
+	datTreatmentVisitDate DATE
+);
+ 
+ALTER TABLE tblTreatmentSet
+ADD CONSTRAINT fk_doctor
+FOREIGN KEY (intDoctorId)
+REFERENCES tblDoctor(intDoctorId)
+ON UPDATE CASCADE
+ON DELETE NO ACTION;
+ 
+ALTER TABLE tblTreatmentSet
+ADD CONSTRAINT fk_patient
+FOREIGN KEY (intPatientId)
+REFERENCES tblPatient(intPatientId)
+ON UPDATE CASCADE
+ON DELETE NO ACTION;
+ 
+ALTER TABLE tblTreatmentSet
+ADD CONSTRAINT fk_ttype
+FOREIGN KEY (intTreatmentTypeId)
+REFERENCES tblTreatmentType(intTreatmentTypeId)
+ON UPDATE CASCADE
+ON DELETE NO ACTION;
+ 
+ALTER TABLE tblTreatmentVisit
+ADD CONSTRAINT fk_tset
+FOREIGN KEY (intTreatmentSetId)
+REFERENCES tblTreatmentSet(intTreatmentSetId)
+ON UPDATE CASCADE
+ON DELETE NO ACTION;
